@@ -1,0 +1,26 @@
+# TaskMind Configuration
+# Copy to ~/.config/taskmind/config.yaml and customize
+
+general:
+  tracking_interval_seconds: 10    # How often to sample active window
+  idle_threshold_minutes: 5        # No input for this long = idle
+  work_start_hour: 9
+  work_end_hour: 18
+  recap_time: "17:30"              # Daily recap notification time
+
+timesheet:
+  minimum_block_minutes: 5         # Ignore blocks shorter than this
+  round_to_minutes: 15             # Round entries to nearest N minutes
+  include_idle_as_break: true
+
+tracking:
+  blacklisted_apps: []             # Never track these (e.g. ["1password", "keepassxc"])
+  blacklisted_titles: []           # Ignore windows with these in title
+
+dashboard:
+  host: "127.0.0.1"
+  port: 7890
+
+notifications:
+  enabled: true
+  daily_recap: true

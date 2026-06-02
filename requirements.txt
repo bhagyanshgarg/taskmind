@@ -1,0 +1,5 @@
+PyYAML>=5.1
+click>=7.0
+pystray>=0.19
+Pillow>=6.0
+apscheduler>=3.6

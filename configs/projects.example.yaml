@@ -1,0 +1,42 @@
+# TaskMind Project Rules
+# Copy to ~/.config/taskmind/projects.yaml and customize
+#
+# Each project has a name and a list of matchers.
+# Matchers are checked in order; first match wins.
+# Matcher types: window_title, app_name, git_branch, directory
+
+projects:
+  - name: "Meetings"
+    matchers:
+      - type: window_title
+        contains: ["Zoom Meeting", "Google Meet", "Microsoft Teams", "Huddle"]
+      - type: app_name
+        equals: ["zoom", "teams"]
+
+  - name: "Code Review"
+    matchers:
+      - type: window_title
+        contains: ["Pull Request", "Merge Request", "Review"]
+      - type: app_name
+        equals: ["firefox", "chromium", "google-chrome"]
+        window_title_contains: ["pull/", "merge_requests/"]
+
+  - name: "Communication"
+    matchers:
+      - type: app_name
+        equals: ["slack", "discord", "telegram-desktop", "thunderbird"]
+
+  - name: "Documentation"
+    matchers:
+      - type: window_title
+        contains: ["Google Docs", "Notion", "Confluence", ".md -"]
+
+  # Example: match by directory or git branch visible in terminal/IDE title
+  # - name: "Project Alpha"
+  #   matchers:
+  #     - type: window_title
+  #       contains: ["project-alpha", "ALPHA-"]
+  #     - type: git_branch
+  #       contains: ["feature/alpha"]
+  #     - type: directory
+  #       contains: ["/projects/alpha"]
