@@ -178,5 +178,38 @@ def dashboard():
     os.system("xdg-open '{}' 2>/dev/null &".format(url))
 
 
+@main.command(name="install-extension")
+def install_extension():
+    """Install Window Calls GNOME extension (required for Wayland)."""
+    import urllib.request
+    import zipfile
+    ext_uuid = "window-calls@domandoman.xyz"
+    ext_url = "https://extensions.gnome.org/extension-data/window-callsdomandoman.xyz.v11.shell-extension.zip"
+    ext_dir = os.path.expanduser("~/.local/share/gnome-shell/extensions/{}".format(ext_uuid))
+
+    click.echo("Downloading Window Calls extension...")
+    zip_path = "/tmp/window-calls.zip"
+    try:
+        urllib.request.urlretrieve(ext_url, zip_path)
+    except Exception as e:
+        click.echo("Download failed: {}".format(e))
+        return
+
+    os.makedirs(ext_dir, exist_ok=True)
+    with zipfile.ZipFile(zip_path, "r") as z:
+        z.extractall(ext_dir)
+
+    click.echo("Enabling extension...")
+    os.system("gnome-extensions enable {} 2>/dev/null".format(ext_uuid))
+
+    click.echo("")
+    click.echo("✅ Extension installed!")
+    click.echo("")
+    click.echo("⚠️  You MUST log out and log back in for it to activate.")
+    click.echo("   (On X11, press Alt+F2 → type 'r' → Enter to restart shell)")
+    click.echo("")
+    click.echo("After re-login, run: taskmind status")
+
+
 if __name__ == "__main__":
     main()

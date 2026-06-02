@@ -38,6 +38,10 @@ cd taskmind
 bash install.sh
 ```
 
+The install script handles everything: system deps, Python venv, configs, GNOME Wayland extension (if needed), systemd service, and PATH setup.
+
+> **Wayland users:** Log out and back in once after install to activate window tracking.
+
 ### 2. Configure Projects
 
 Edit `~/.config/taskmind/projects.yaml`:
@@ -84,9 +88,10 @@ taskmind dashboard   Open web dashboard
 
 ## System Requirements
 
-- Ubuntu 18.04+ (or any Debian-based Linux with X11)
+- Ubuntu 18.04+ (or any Debian-based Linux)
 - Python 3.6+
-- `xdotool`, `xprintidle`, `libnotify-bin` (installed automatically)
+- X11 or Wayland (GNOME) — auto-detected
+- `xdotool`, `xprintidle`, `libnotify-bin`, `wmctrl` (installed automatically)
 
 ## Project Structure
 
