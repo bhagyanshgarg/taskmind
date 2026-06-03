@@ -44,16 +44,20 @@ The install script handles everything: system deps, Python venv, configs, GNOME 
 
 ### 2. Configure Projects
 
-Edit `~/.config/taskmind/projects.yaml`:
+The installer will guide you through project setup interactively. Or run anytime:
 
-```yaml
-projects:
-  - name: "My Project"
-    matchers:
-      - type: window_title
-        contains: ["my-project", "PROJ-"]
-      - type: app_name
-        equals: ["zoom"]
+```bash
+taskmind setup           # Full guided setup wizard
+taskmind add-project     # Add a single project
+taskmind remove-project  # Remove a project
+taskmind projects        # List all projects
+```
+
+No YAML editing required. Just answer prompts like:
+```
+Project name: Client Website
+Keywords to match in window title: client-site, CLIENT-
+✓ Added 'Client Website'
 ```
 
 ### 3. Start Tracking
@@ -74,16 +78,19 @@ taskmind timesheet --export csv > timesheet.csv
 ## CLI Commands
 
 ```
-taskmind start       Start the tracking daemon
-taskmind stop        Stop the tracking daemon
-taskmind status      Show status and today's hours
-taskmind today       Show today's activity recap
-taskmind yesterday   Show yesterday's recap
-taskmind timesheet   Generate timesheet (--export csv|json)
-taskmind search      Full-text search across activities
-taskmind projects    List configured projects
-taskmind config      Open config in $EDITOR
-taskmind dashboard   Open web dashboard
+taskmind start           Start the tracking daemon
+taskmind stop            Stop the tracking daemon
+taskmind status          Show status and today's hours
+taskmind today           Show today's activity recap
+taskmind yesterday       Show yesterday's recap
+taskmind timesheet       Generate timesheet (--export csv|json)
+taskmind search          Full-text search across activities
+taskmind setup           Interactive project setup wizard
+taskmind add-project     Add a new project (guided)
+taskmind remove-project  Remove a project
+taskmind projects        List configured projects
+taskmind config          Open config in $EDITOR
+taskmind dashboard       Open web dashboard
 ```
 
 ## System Requirements
