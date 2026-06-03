@@ -7,7 +7,6 @@ On Wayland (GNOME 42+), requires the 'Window Calls' extension:
 import subprocess
 import json
 import os
-import re
 
 
 def _run(cmd):
@@ -22,24 +21,52 @@ def _run(cmd):
 def _get_window_wayland():
     """Get focused window via Window Calls GNOME extension D-Bus API."""
     try:
+        # Get window list to find focused window ID and wm_class
         result = subprocess.run(
             ["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
              "--object-path", "/org/gnome/Shell/Extensions/Windows",
-             "--method", "org.gnome.Shell.Extensions.Windows.GetFocused"],
+             "--method", "org.gnome.Shell.Extensions.Windows.List"],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode != 0 or "Error" in result.stdout:
+            return None
+
+        raw = result.stdout.strip()
+        start = raw.index("'") + 1
+        end = raw.rindex("'")
+        windows = json.loads(raw[start:end])
+
+        # Find focused window
+        focused = None
+        for w in windows:
+            if w.get("focus"):
+                focused = w
+                break
+        if not focused:
+            return None
+
+        # Get title via GetTitle method
+        wid = focused["id"]
+        title_result = subprocess.run(
+            ["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+             "--object-path", "/org/gnome/Shell/Extensions/Windows",
+             "--method", "org.gnome.Shell.Extensions.Windows.GetTitle",
+             str(wid)],
             capture_output=True, text=True, timeout=2,
         )
-        if result.returncode == 0 and "Error" not in result.stdout:
-            match = re.search(r"\('(.+)',\)", result.stdout, re.DOTALL)
-            if match:
-                info = json.loads(match.group(1))
-                return {
-                    "window_title": info.get("title", ""),
-                    "app_name": info.get("wm_class", ""),
-                    "window_class": info.get("wm_class_instance", info.get("wm_class", "")),
-                }
+        title = ""
+        if title_result.returncode == 0:
+            t = title_result.stdout.strip()
+            if t.startswith("('") and t.endswith("',)"):
+                title = t[2:-3]
+
+        return {
+            "window_title": title,
+            "app_name": focused.get("wm_class", ""),
+            "window_class": focused.get("wm_class_instance", focused.get("wm_class", "")),
+        }
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _get_window_x11():
@@ -67,41 +94,16 @@ def _get_window_x11():
     }
 
 
-def _get_window_wmctrl():
-    """Fallback: get any visible window from wmctrl (limited on Wayland)."""
-    output = _run(["wmctrl", "-l"])
-    if not output:
-        return None
-    # Get the last line (most recently raised window)
-    lines = [l for l in output.strip().split("\n") if l.strip()]
-    if not lines:
-        return None
-    # Format: 0x01800007  0  hostname Title here
-    parts = lines[-1].split(None, 3)
-    title = parts[3] if len(parts) > 3 else ""
-    if title:
-        return {"window_title": title, "app_name": "", "window_class": ""}
-    return None
-
-
 def get_active_window():
-    """Get active window info. Tries Wayland first, then X11, then wmctrl fallback."""
+    """Get active window info. Tries Wayland first, then X11."""
     session_type = os.environ.get("XDG_SESSION_TYPE", "")
 
     if session_type == "wayland":
-        # Try Window Calls extension first (best for GNOME Wayland)
         result = _get_window_wayland()
         if result:
             return result
-        # Fall through to X11 (for XWayland apps)
 
-    # Try xdotool (works on X11, partially on XWayland)
     result = _get_window_x11()
-    if result:
-        return result
-
-    # Last resort: wmctrl
-    result = _get_window_wmctrl()
     if result:
         return result
 

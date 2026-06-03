@@ -133,9 +133,16 @@ if [ "$NEEDS_RELOGIN" = true ]; then
     echo "  Log out and log back in once to activate the"
     echo "  window tracking extension. Then run:"
     echo ""
+    echo "      taskmind setup"
     echo "      taskmind start"
     echo "═══════════════════════════════════════════════════════"
 else
+    # Run interactive project setup
+    echo ""
+    echo "═══════════════════════════════════════════════════════"
+    echo ""
+    "$INSTALL_DIR/venv/bin/taskmind" setup
+    echo ""
     echo "  Starting daemon now..."
     systemctl --user start taskmind 2>/dev/null || \
         ($INSTALL_DIR/venv/bin/python -m taskmind.daemon &)

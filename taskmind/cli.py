@@ -160,12 +160,193 @@ def projects():
     from taskmind.config import load_projects
     projs = load_projects()
     if not projs:
-        click.echo("No projects configured. Edit: {}".format(PROJECTS_FILE))
+        click.echo("No projects configured.")
+        click.echo("Run: taskmind add-project")
         return
     click.echo("Configured projects:")
     for p in projs:
         matchers = len(p.get("matchers", []))
-        click.echo("  • {} ({} matchers)".format(p["name"], matchers))
+        click.echo("  • {} ({} rules)".format(p["name"], matchers))
+
+
+@main.command(name="add-project")
+def add_project():
+    """Interactively add a new project with matching rules."""
+    import yaml
+    from taskmind.config import PROJECTS_FILE, ensure_dirs
+
+    ensure_dirs()
+    click.echo("➕ Add a New Project")
+    click.echo("─" * 40)
+    click.echo("")
+
+    name = click.prompt("Project name (e.g. 'Client Website', 'Meetings')")
+
+    click.echo("")
+    click.echo("Now let's add rules to detect this project.")
+    click.echo("TaskMind matches by window title and app name.")
+    click.echo("")
+    click.echo("Examples:")
+    click.echo("  - 'Gmail' matches any window with Gmail in title")
+    click.echo("  - 'zoom' matches the Zoom app")
+    click.echo("  - 'my-project' matches VS Code/terminal with that folder")
+    click.echo("")
+
+    matchers = []
+
+    # Title keywords
+    title_input = click.prompt(
+        "Window title keywords (comma-separated, or press Enter to skip)",
+        default="", show_default=False
+    )
+    if title_input.strip():
+        keywords = [k.strip() for k in title_input.split(",") if k.strip()]
+        matchers.append({"type": "window_title", "contains": keywords})
+
+    # App names
+    click.echo("")
+    click.echo("Common app names: google-chrome, firefox, gnome-terminal-server,")
+    click.echo("  code (VS Code), slack, zoom, teams, discord")
+    app_input = click.prompt(
+        "App names to match (comma-separated, or press Enter to skip)",
+        default="", show_default=False
+    )
+    if app_input.strip():
+        apps = [a.strip() for a in app_input.split(",") if a.strip()]
+        matcher = {"type": "app_name", "equals": apps}
+        # If title keywords also provided for this app, add filter
+        app_title = click.prompt(
+            "  Only when title also contains (optional, Enter to skip)",
+            default="", show_default=False
+        )
+        if app_title.strip():
+            matcher["window_title_contains"] = [k.strip() for k in app_title.split(",")]
+        matchers.append(matcher)
+
+    if not matchers:
+        click.echo("No rules added. Project not saved.")
+        return
+
+    # Load existing projects and append
+    if os.path.exists(PROJECTS_FILE):
+        with open(PROJECTS_FILE, "r") as f:
+            data = yaml.safe_load(f) or {}
+    else:
+        data = {}
+
+    if "projects" not in data:
+        data["projects"] = []
+
+    data["projects"].append({"name": name, "matchers": matchers})
+
+    with open(PROJECTS_FILE, "w") as f:
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+    click.echo("")
+    click.echo("✅ Project '{}' added!".format(name))
+    click.echo("   Rules will apply to new activity from now on.")
+    click.echo("")
+    click.echo("   Tip: Run 'taskmind projects' to see all projects.")
+    click.echo("   Tip: Run 'taskmind add-project' to add more.")
+
+
+@main.command(name="remove-project")
+def remove_project():
+    """Remove a project by name."""
+    import yaml
+    from taskmind.config import PROJECTS_FILE, load_projects
+
+    projs = load_projects()
+    if not projs:
+        click.echo("No projects configured.")
+        return
+
+    click.echo("Current projects:")
+    for i, p in enumerate(projs, 1):
+        click.echo("  {}. {}".format(i, p["name"]))
+
+    choice = click.prompt("Enter number to remove", type=int)
+    if choice < 1 or choice > len(projs):
+        click.echo("Invalid choice.")
+        return
+
+    removed = projs.pop(choice - 1)
+
+    with open(PROJECTS_FILE, "w") as f:
+        yaml.dump({"projects": projs}, f, default_flow_style=False, sort_keys=False)
+
+    click.echo("✅ Removed '{}'.".format(removed["name"]))
+
+
+@main.command(name="setup")
+def setup_projects():
+    """Interactive first-time setup — add common projects quickly."""
+    import yaml
+    from taskmind.config import PROJECTS_FILE, ensure_dirs
+
+    ensure_dirs()
+    click.echo("🧠 TaskMind — Quick Project Setup")
+    click.echo("═" * 40)
+    click.echo("")
+    click.echo("Let's set up your projects so TaskMind can")
+    click.echo("auto-classify your work. You can always add")
+    click.echo("more later with 'taskmind add-project'.")
+    click.echo("")
+
+    projects = []
+
+    # Offer common presets
+    presets = [
+        ("Meetings", {"type": "window_title", "contains": ["Zoom Meeting", "Google Meet", "Microsoft Teams", "Huddle"]}),
+        ("Communication", {"type": "app_name", "equals": ["slack", "discord", "telegram-desktop"]}),
+        ("Email", {"type": "window_title", "contains": ["Gmail", "Outlook", "Mail"]}),
+        ("Social Media", {"type": "window_title", "contains": ["Facebook", "Instagram", "LinkedIn", "Twitter", "YouTube"]}),
+        ("Code Review", {"type": "window_title", "contains": ["Pull Request", "Merge Request"]}),
+    ]
+
+    click.echo("Common categories (y/n for each):")
+    click.echo("")
+    for name, matcher in presets:
+        if click.confirm("  Add '{}'?".format(name), default=True):
+            projects.append({"name": name, "matchers": [matcher]})
+
+    # Custom projects
+    click.echo("")
+    click.echo("─" * 40)
+    click.echo("Now add your own projects (your work repos, clients, etc.)")
+    click.echo("")
+
+    while True:
+        add_more = click.confirm("Add a custom project?", default=True)
+        if not add_more:
+            break
+
+        name = click.prompt("  Project name")
+        keywords = click.prompt("  Keywords to match in window title (comma-separated)")
+        kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
+        if kw_list:
+            projects.append({"name": name, "matchers": [{"type": "window_title", "contains": kw_list}]})
+            click.echo("  ✓ Added '{}'".format(name))
+        click.echo("")
+
+    if not projects:
+        click.echo("No projects added. Run 'taskmind setup' again anytime.")
+        return
+
+    # Save
+    with open(PROJECTS_FILE, "w") as f:
+        yaml.dump({"projects": projects}, f, default_flow_style=False, sort_keys=False)
+
+    click.echo("")
+    click.echo("═" * 40)
+    click.echo("✅ Setup complete! {} projects configured.".format(len(projects)))
+    click.echo("")
+    click.echo("Commands:")
+    click.echo("  taskmind projects       — see all projects")
+    click.echo("  taskmind add-project    — add another project")
+    click.echo("  taskmind remove-project — remove a project")
+    click.echo("  taskmind status         — check tracking")
+    click.echo("")
 
 
 @main.command()
