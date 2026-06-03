@@ -545,6 +545,80 @@ def dashboard():
     run_dashboard()
 
 
+
+@main.command()
+@click.option("--output", "-o", "output_path", default=None, help="Output directory")
+def backup(output_path):
+    """Backup all TaskMind data (DB + configs + recordings)."""
+    import shutil
+    from taskmind.config import DATA_DIR, CONFIG_DIR
+
+    if not output_path:
+        output_path = os.path.expanduser("~/taskmind-backup-{}".format(date.today().isoformat()))
+
+    os.makedirs(output_path, exist_ok=True)
+    db_src = os.path.join(DATA_DIR, "taskmind.db")
+    if os.path.exists(db_src):
+        shutil.copy2(db_src, output_path)
+    config_dest = os.path.join(output_path, "config")
+    if os.path.isdir(CONFIG_DIR):
+        shutil.copytree(CONFIG_DIR, config_dest, dirs_exist_ok=True)
+    rec_src = os.path.join(DATA_DIR, "recordings")
+    if os.path.isdir(rec_src) and os.listdir(rec_src):
+        shutil.copytree(rec_src, os.path.join(output_path, "recordings"), dirs_exist_ok=True)
+    click.echo("✅ Backup saved to: {}".format(output_path))
+
+
+@main.command(name="import-data")
+@click.argument("backup_path")
+def import_data(backup_path):
+    """Restore TaskMind data from a backup."""
+    import shutil
+    from taskmind.config import DATA_DIR, CONFIG_DIR
+
+    backup_path = os.path.expanduser(backup_path)
+    if not os.path.isdir(backup_path):
+        click.echo("Backup not found: {}".format(backup_path))
+        return
+    db_file = os.path.join(backup_path, "taskmind.db")
+    if os.path.exists(db_file):
+        shutil.copy2(db_file, os.path.join(DATA_DIR, "taskmind.db"))
+        click.echo("  ✓ Database restored")
+    config_src = os.path.join(backup_path, "config")
+    if os.path.isdir(config_src):
+        shutil.copytree(config_src, CONFIG_DIR, dirs_exist_ok=True)
+        click.echo("  ✓ Configs restored")
+    click.echo("✅ Import complete.")
+
+
+@main.command()
+@click.option("--purge", is_flag=True, help="Also delete all data")
+def uninstall(purge):
+    """Uninstall TaskMind (stop service, remove files)."""
+    import shutil
+    from taskmind.config import DATA_DIR, CONFIG_DIR
+
+    click.echo("Uninstalling TaskMind...")
+    os.system("systemctl --user stop taskmind 2>/dev/null")
+    os.system("systemctl --user disable taskmind 2>/dev/null")
+    service = os.path.expanduser("~/.config/systemd/user/taskmind.service")
+    if os.path.exists(service):
+        os.remove(service)
+    bin_link = os.path.expanduser("~/.local/bin/taskmind")
+    if os.path.exists(bin_link):
+        os.remove(bin_link)
+    venv = os.path.join(DATA_DIR, "venv")
+    if os.path.isdir(venv):
+        shutil.rmtree(venv)
+    if purge:
+        if os.path.isdir(DATA_DIR):
+            shutil.rmtree(DATA_DIR)
+        if os.path.isdir(CONFIG_DIR):
+            shutil.rmtree(CONFIG_DIR)
+        click.echo("✅ TaskMind fully removed (data deleted).")
+    else:
+        click.echo("✅ TaskMind uninstalled. Data kept at: {}".format(DATA_DIR))
+
 @main.command(name="install-extension")
 def install_extension():
     """Install Window Calls GNOME extension (required for Wayland)."""
