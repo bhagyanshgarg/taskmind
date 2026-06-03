@@ -61,6 +61,7 @@ python3 -m venv "$INSTALL_DIR/venv"
 source "$INSTALL_DIR/venv/bin/activate"
 pip install --quiet --upgrade pip
 pip install --quiet "$SCRIPT_DIR"
+pip install --quiet fastapi uvicorn
 
 # --- 5. Config files ---
 echo "[5/7] Setting up configuration..."
@@ -122,6 +123,7 @@ echo "  Check status:      taskmind status"
 echo "  Today's recap:     taskmind today"
 echo "  Auto timesheet:    taskmind timesheet"
 echo "  Export CSV:        taskmind timesheet --export csv"
+echo "  Web dashboard:     taskmind dashboard"
 echo ""
 echo "  Config:   $CONFIG_DIR/config.yaml"
 echo "  Projects: $CONFIG_DIR/projects.yaml"
