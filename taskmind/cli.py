@@ -127,6 +127,86 @@ def search(query):
 
 
 @main.command()
+def record():
+    """Start audio recording."""
+    from taskmind.capture.audio_recorder import start_recording, is_recording
+    from taskmind.database import insert_recording
+    from taskmind.utils.notifications import notify
+    from datetime import datetime
+
+    if is_recording():
+        click.echo("⏺ Already recording. Run 'taskmind stop-recording' to stop.")
+        return
+
+    filepath = start_recording()
+    if filepath:
+        insert_recording(datetime.now().isoformat(), filepath)
+        notify("🔴 Recording", "Audio recording started")
+        click.echo("🔴 Recording started: {}".format(os.path.basename(filepath)))
+        click.echo("   Run 'taskmind stop-recording' to stop.")
+    else:
+        click.echo("Error: Could not start recording. Install pulseaudio-utils or pipewire.")
+
+
+@main.command(name="stop-recording")
+def stop_recording_cmd():
+    """Stop audio recording and transcribe."""
+    from taskmind.capture.audio_recorder import stop_recording, is_recording
+    from taskmind.database import update_recording
+    from taskmind.processing.transcriber import transcribe
+    from taskmind.utils.notifications import notify
+    from datetime import datetime
+
+    if not is_recording():
+        click.echo("No active recording.")
+        return
+
+    result = stop_recording()
+    if not result:
+        click.echo("Error stopping recording.")
+        return
+
+    filepath, duration = result
+    click.echo("⏹ Recording stopped ({} seconds)".format(duration))
+    click.echo("  Transcribing...")
+
+    transcript = transcribe(filepath)
+    ended_at = datetime.now().isoformat()
+    status = "done" if transcript else "failed"
+    update_recording(filepath, ended_at, duration, transcript, status)
+
+    if transcript and not transcript.startswith("["):
+        notify("✅ Transcription Done", transcript[:100])
+        click.echo("  ✅ Transcript ({} chars):".format(len(transcript)))
+        click.echo("  {}".format(transcript[:200]))
+    else:
+        click.echo("  ⚠ {}".format(transcript))
+
+
+@main.command()
+def recordings():
+    """List recent recordings."""
+    from taskmind.database import get_recordings
+
+    recs = get_recordings()
+    if not recs:
+        click.echo("No recordings yet. Run 'taskmind record' to start one.")
+        return
+
+    click.echo("Recent recordings:")
+    click.echo("")
+    for r in recs:
+        dur = r.get("duration_seconds") or 0
+        status = r.get("status", "?")
+        has_transcript = "✓" if r.get("transcript") else "✗"
+        click.echo("  [{}] {}s | {} | transcript: {}".format(
+            r["started_at"][:16], dur, status, has_transcript
+        ))
+        if r.get("transcript"):
+            click.echo("    {}".format(r["transcript"][:80]))
+
+
+@main.command()
 def start():
     """Start the daemon."""
     if is_daemon_running():

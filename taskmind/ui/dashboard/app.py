@@ -148,6 +148,20 @@ def api_recap(target_date: str):
     return {"date": target_date, "text": generate_recap(target_date)}
 
 
+@app.get("/api/recordings")
+def api_recordings():
+    from taskmind.database import get_recordings
+    return {"recordings": get_recordings()}
+
+
+@app.get("/api/search-transcripts")
+def api_search_transcripts(q: str = ""):
+    if not q:
+        return {"results": []}
+    from taskmind.database import search_transcripts
+    return {"results": search_transcripts(q)}
+
+
 def run_dashboard():
     """Start the dashboard server."""
     import uvicorn

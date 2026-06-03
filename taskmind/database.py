@@ -41,9 +41,32 @@ CREATE VIRTUAL TABLE IF NOT EXISTS activities_fts USING fts5(
     content=activities, content_rowid=id
 );
 
+CREATE VIRTUAL TABLE IF NOT EXISTS transcripts_fts USING fts5(
+    transcript,
+    content=recordings,
+    content_rowid=id
+);
+
+CREATE TABLE IF NOT EXISTS recordings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    duration_seconds INTEGER,
+    file_path TEXT,
+    transcript TEXT,
+    status TEXT DEFAULT 'recording',
+    created_at TEXT NOT NULL
+);
+
 CREATE TRIGGER IF NOT EXISTS activities_ai AFTER INSERT ON activities BEGIN
     INSERT INTO activities_fts(rowid, window_title, app_name, project_name)
     VALUES (new.id, new.window_title, new.app_name, new.project_name);
+END;
+
+CREATE TRIGGER IF NOT EXISTS recordings_ai AFTER UPDATE OF transcript ON recordings
+WHEN new.transcript IS NOT NULL BEGIN
+    INSERT OR REPLACE INTO transcripts_fts(rowid, transcript)
+    VALUES (new.id, new.transcript);
 END;
 """
 
@@ -148,3 +171,47 @@ def get_total_tracked_today():
     ).fetchone()
     conn.close()
     return row["total"]
+
+
+def insert_recording(started_at, file_path):
+    """Insert a new recording entry."""
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO recordings (started_at, file_path, status, created_at) VALUES (?,?,?,?)",
+        (started_at, file_path, "recording", started_at),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_recording(file_path, ended_at, duration, transcript, status="done"):
+    """Update recording with transcript after completion."""
+    conn = get_db()
+    conn.execute(
+        "UPDATE recordings SET ended_at=?, duration_seconds=?, transcript=?, status=? WHERE file_path=?",
+        (ended_at, duration, transcript, status, file_path),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_recordings(limit=20):
+    """Get recent recordings."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM recordings ORDER BY started_at DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def search_transcripts(query):
+    """Search transcripts via FTS5."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT r.* FROM recordings r JOIN transcripts_fts f ON r.id=f.rowid "
+        "WHERE transcripts_fts MATCH ? ORDER BY r.started_at DESC LIMIT 20",
+        (query,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
