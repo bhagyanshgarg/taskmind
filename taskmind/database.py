@@ -58,6 +58,17 @@ CREATE TABLE IF NOT EXISTS recordings (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS git_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    repo_path TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    branch TEXT,
+    message TEXT,
+    files_changed INTEGER DEFAULT 0,
+    project_id INTEGER
+);
+
 CREATE TRIGGER IF NOT EXISTS activities_ai AFTER INSERT ON activities BEGIN
     INSERT INTO activities_fts(rowid, window_title, app_name, project_name)
     VALUES (new.id, new.window_title, new.app_name, new.project_name);

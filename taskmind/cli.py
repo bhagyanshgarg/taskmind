@@ -238,6 +238,90 @@ def stop():
         click.echo("Error stopping daemon: {}".format(e))
 
 
+@main.command(name="git-watch")
+@click.argument("repo_path", required=False)
+def git_watch(repo_path):
+    """Add a git repo to watch, or scan all watched repos now."""
+    import yaml
+    from taskmind.config import CONFIG_FILE
+
+    config = load_config()
+    repos = config.get("git", {}).get("watch_repos", [])
+
+    if repo_path:
+        repo_path = os.path.abspath(os.path.expanduser(repo_path))
+        if not os.path.isdir(os.path.join(repo_path, ".git")):
+            click.echo("Not a git repo: {}".format(repo_path))
+            return
+        if repo_path not in repos:
+            if "git" not in config:
+                config["git"] = {"enabled": True, "watch_repos": []}
+            config["git"]["watch_repos"].append(repo_path)
+            with open(CONFIG_FILE, "w") as f:
+                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            click.echo("✅ Now watching: {}".format(repo_path))
+        else:
+            click.echo("Already watching: {}".format(repo_path))
+    else:
+        from taskmind.capture.git_watcher import scan_repos
+        events = scan_repos()
+        if events:
+            click.echo("New git events:")
+            for e in events:
+                click.echo("  • [{}] {} – {}".format(e["repo"], e["branch"], e["message"]))
+        else:
+            click.echo("No new git events.")
+        if repos:
+            click.echo("\nWatched repos:")
+            for r in repos:
+                click.echo("  • {}".format(r))
+        else:
+            click.echo("\nNo repos configured. Run: taskmind git-watch /path/to/repo")
+
+
+@main.command()
+@click.option("--to", "target", type=click.Choice(["csv", "json", "clockify", "toggl", "jira"]), required=True)
+@click.option("--date", "-d", "target_date", default=None)
+@click.option("--output", "-o", "output_path", default=None)
+def export(target, target_date, output_path):
+    """Export timesheet to CSV, JSON, Clockify, Toggl, or Jira Tempo."""
+    from taskmind.processing.export import export_csv, export_json, export_clockify, export_toggl, export_jira_tempo
+
+    if target_date is None:
+        target_date = date.today().isoformat()
+
+    if target == "csv":
+        result = export_csv(target_date, output_path)
+        if output_path:
+            click.echo("✅ Exported to {}".format(output_path))
+        else:
+            click.echo(result)
+    elif target == "json":
+        result = export_json(target_date, output_path)
+        if output_path:
+            click.echo("✅ Exported to {}".format(output_path))
+        else:
+            click.echo(result)
+    elif target == "clockify":
+        result = export_clockify(target_date)
+        if "error" in result:
+            click.echo("❌ {}".format(result["error"]))
+        else:
+            click.echo("✅ Clockify: {} pushed, {} failed".format(result["pushed"], result["failed"]))
+    elif target == "toggl":
+        result = export_toggl(target_date)
+        if "error" in result:
+            click.echo("❌ {}".format(result["error"]))
+        else:
+            click.echo("✅ Toggl: {} pushed, {} failed".format(result["pushed"], result["failed"]))
+    elif target == "jira":
+        result = export_jira_tempo(target_date)
+        if "error" in result:
+            click.echo("❌ {}".format(result["error"]))
+        else:
+            click.echo("✅ Jira Tempo: {} pushed, {} failed".format(result["pushed"], result["failed"]))
+
+
 @main.command()
 def config():
     """Open config file in editor."""

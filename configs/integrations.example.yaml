@@ -1,0 +1,14 @@
+# TaskMind Integrations Configuration
+# Copy to ~/.config/taskmind/integrations.yaml
+
+clockify:
+  api_key: ""          # Get from: https://app.clockify.me/user/settings
+  workspace_id: ""     # Get from: Clockify workspace settings
+
+toggl:
+  api_token: ""        # Get from: https://track.toggl.com/profile
+  workspace_id: ""     # Get from: Toggl workspace settings
+
+jira_tempo:
+  api_token: ""        # Get from: Tempo > Settings > API Integration
+  account_id: ""       # Your Jira account ID
