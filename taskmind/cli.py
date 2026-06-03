@@ -355,8 +355,13 @@ def dashboard():
     cfg = load_config()
     port = cfg["dashboard"]["port"]
     url = "http://127.0.0.1:{}".format(port)
-    click.echo("Opening dashboard: {}".format(url))
+    click.echo("Starting dashboard at {}".format(url))
+    click.echo("Press Ctrl+C to stop.")
+    # Open browser
     os.system("xdg-open '{}' 2>/dev/null &".format(url))
+    # Start server
+    from taskmind.ui.dashboard.app import run_dashboard
+    run_dashboard()
 
 
 @main.command(name="install-extension")

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskMind Dashboard</title>
+<style>
+:root { --bg: #0f1117; --card: #1a1d27; --border: #2a2d37; --accent: #3b82f6; --green: #22c55e; --text: #e2e8f0; --muted: #94a3b8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 24px; }
+nav .logo { font-weight: 700; font-size: 18px; }
+nav .logo span { color: var(--accent); }
+nav a { color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 14px; }
+nav a.active, nav a:hover { color: var(--text); background: var(--border); }
+nav .status { margin-left: auto; font-size: 13px; color: var(--green); }
+.container { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+.card h2 { font-size: 16px; margin-bottom: 12px; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+.stat .value { font-size: 28px; font-weight: 700; color: var(--accent); }
+.stat .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.timeline { display: flex; flex-wrap: wrap; gap: 3px; margin: 12px 0; }
+.timeline .block { width: 18px; height: 18px; border-radius: 3px; cursor: pointer; position: relative; }
+.timeline .block:hover::after { content: attr(data-tip); position: absolute; bottom: 22px; left: -10px; background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; z-index: 10; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+.project-list { list-style: none; }
+.project-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.project-list li:last-child { border: none; }
+.btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+input, select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 14px; width: 100%; }
+.form-row { display: flex; gap: 10px; margin-top: 12px; }
+.form-row input { flex: 1; }
+.page { display: none; }
+.page.active { display: block; }
+.date-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.date-nav button { background: var(--border); border: none; color: var(--text); padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.date-nav input[type=date] { width: auto; }
+.total-row { font-weight: 700; color: var(--accent); }
+.export-btns { display: flex; gap: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">🧠 Task<span>Mind</span></div>
+  <a href="#" data-page="home" class="active">Home</a>
+  <a href="#" data-page="timesheet">Timesheet</a>
+  <a href="#" data-page="search">Search</a>
+  <a href="#" data-page="settings">Settings</a>
+  <div class="status" id="nav-status">●</div>
+</nav>
+
+<div class="container">
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="stats" id="home-stats"></div>
+  <div class="card">
+    <h2>Timeline — Today</h2>
+    <div class="timeline" id="home-timeline"></div>
+  </div>
+  <div class="card">
+    <h2>Projects — Today</h2>
+    <table><thead><tr><th>Project</th><th>Duration</th><th>%</th></tr></thead><tbody id="home-projects"></tbody></table>
+  </div>
+</div>
+
+<!-- TIMESHEET -->
+<div class="page" id="page-timesheet">
+  <div class="date-nav">
+    <button onclick="changeDate(-1)">← Prev</button>
+    <input type="date" id="ts-date" onchange="loadTimesheet()">
+    <button onclick="changeDate(1)">Next →</button>
+  </div>
+  <div class="card">
+    <h2>Timesheet</h2>
+    <table><thead><tr><th>Start</th><th>End</th><th>Project</th><th>Duration</th><th>Description</th></tr></thead><tbody id="ts-body"></tbody></table>
+    <div class="export-btns">
+      <button class="btn btn-primary" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH -->
+<div class="page" id="page-search">
+  <div class="card">
+    <h2>Search Activities</h2>
+    <input type="text" id="search-input" placeholder="Search window titles, apps, projects..." onkeyup="if(event.key==='Enter')doSearch()">
+    <button class="btn btn-primary" style="margin-top:10px" onclick="doSearch()">Search</button>
+  </div>
+  <div class="card">
+    <table><thead><tr><th>Time</th><th>App</th><th>Title</th><th>Project</th></tr></thead><tbody id="search-results"></tbody></table>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="card">
+    <h2>Projects</h2>
+    <ul class="project-list" id="settings-projects"></ul>
+    <div class="form-row">
+      <input type="text" id="new-project-name" placeholder="Project name">
+      <input type="text" id="new-project-keywords" placeholder="Keywords (comma-separated)">
+      <button class="btn btn-primary" onclick="addProject()">Add</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const today = new Date().toISOString().split('T')[0];
+let currentDate = today;
+
+// Navigation
+document.querySelectorAll('nav a').forEach(a => {
+  a.onclick = e => {
+    e.preventDefault();
+    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + a.dataset.page).classList.add('active');
+    if (a.dataset.page === 'home') loadHome();
+    if (a.dataset.page === 'timesheet') loadTimesheet();
+    if (a.dataset.page === 'settings') loadSettings();
+  };
+});
+
+async function api(url) { return (await fetch(url)).json(); }
+
+// HOME
+async function loadHome() {
+  const summary = await api('/api/summary/' + today);
+  const timeline = await api('/api/timeline/' + today);
+  const status = await api('/api/status');
+
+  document.getElementById('nav-status').textContent = status.running ? '● Tracking' : '○ Stopped';
+  document.getElementById('nav-status').style.color = status.running ? '#22c55e' : '#ef4444';
+
+  const total = summary.total_seconds;
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+  const projects = summary.projects || [];
+
+  document.getElementById('home-stats').innerHTML = `
+    <div class="stat"><div class="value">${h}h ${m}m</div><div class="label">Total Today</div></div>
+    <div class="stat"><div class="value">${projects.length}</div><div class="label">Projects</div></div>
+    <div class="stat"><div class="value">${projects[0]?.project_name || '-'}</div><div class="label">Top Project</div></div>
+  `;
+
+  // Timeline blocks
+  const colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
+  const projColors = {};
+  let ci = 0;
+  const blocks = (timeline.timeline || []).map(t => {
+    const p = t.project;
+    if (!projColors[p]) projColors[p] = colors[ci++ % colors.length];
+    return `<div class="block" style="background:${projColors[p]}" data-tip="${t.slot} ${p}"></div>`;
+  }).join('');
+  document.getElementById('home-timeline').innerHTML = blocks || '<span style="color:var(--muted)">No activity yet</span>';
+
+  // Project table
+  document.getElementById('home-projects').innerHTML = projects.map(p => {
+    const ph = Math.floor(p.total_seconds / 3600), pm = Math.floor((p.total_seconds % 3600) / 60);
+    const pct = total > 0 ? Math.round(p.total_seconds / total * 100) : 0;
+    return `<tr><td>${p.project_name || 'Unclassified'}</td><td>${ph}h ${pm}m</td><td>${pct}%</td></tr>`;
+  }).join('');
+}
+
+// TIMESHEET
+document.getElementById('ts-date').value = today;
+let tsEntries = [];
+
+function changeDate(delta) {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() + delta);
+  currentDate = d.toISOString().split('T')[0];
+  document.getElementById('ts-date').value = currentDate;
+  loadTimesheet();
+}
+
+async function loadTimesheet() {
+  currentDate = document.getElementById('ts-date').value;
+  const data = await api('/api/timesheet/' + currentDate);
+  tsEntries = data.entries || [];
+  let total = 0;
+  document.getElementById('ts-body').innerHTML = tsEntries.map(e => {
+    total += e.duration_minutes;
+    return `<tr><td>${e.start_time}</td><td>${e.end_time}</td><td>${e.project_name}</td><td>${e.duration_minutes}m</td><td>${(e.description||'').slice(0,40)}</td></tr>`;
+  }).join('') + `<tr class="total-row"><td colspan="3">Total</td><td>${Math.floor(total/60)}h ${total%60}m</td><td></td></tr>`;
+}
+
+function exportCSV() {
+  let csv = 'Date,Project,Start,End,Duration (min),Description\n';
+  tsEntries.forEach(e => { csv += `${e.date},${e.project_name},${e.start_time},${e.end_time},${e.duration_minutes},"${e.description||''}"\n`; });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `timesheet-${currentDate}.csv`; a.click();
+}
+
+// SEARCH
+async function doSearch() {
+  const q = document.getElementById('search-input').value;
+  const data = await api('/api/search?q=' + encodeURIComponent(q));
+  document.getElementById('search-results').innerHTML = (data.results || []).map(r =>
+    `<tr><td>${(r.timestamp||'').slice(0,16)}</td><td>${r.app_name||''}</td><td>${(r.window_title||'').slice(0,50)}</td><td>${r.project_name||''}</td></tr>`
+  ).join('') || '<tr><td colspan="4" style="color:var(--muted)">No results</td></tr>';
+}
+
+// SETTINGS
+async function loadSettings() {
+  const data = await api('/api/projects');
+  document.getElementById('settings-projects').innerHTML = (data.projects || []).map((p, i) =>
+    `<li><span><strong>${p.name}</strong> — ${(p.matchers||[]).map(m=>(m.contains||m.equals||[]).join(', ')).join('; ')}</span><button class="btn btn-danger btn-sm" onclick="removeProject(${i})">Remove</button></li>`
+  ).join('') || '<li style="color:var(--muted)">No projects configured</li>';
+}
+
+async function addProject() {
+  const name = document.getElementById('new-project-name').value.trim();
+  const kw = document.getElementById('new-project-keywords').value.trim();
+  if (!name || !kw) return alert('Enter project name and keywords');
+  await fetch('/api/projects/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, keywords: kw.split(',').map(s=>s.trim())})});
+  document.getElementById('new-project-name').value = '';
+  document.getElementById('new-project-keywords').value = '';
+  loadSettings();
+}
+
+async function removeProject(index) {
+  if (!confirm('Remove this project?')) return;
+  await fetch('/api/projects/remove', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({index})});
+  loadSettings();
+}
+
+// Init
+loadHome();
+</script>
+</body>
+</html>

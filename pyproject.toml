@@ -1,6 +1,6 @@
 [project]
 name = "taskmind"
-version = "0.1.2"
+version = "0.2.0"
 description = "Lightweight activity tracker and automatic timesheet generator for Linux"
 requires-python = ">=3.6"
 dependencies = [
@@ -9,6 +9,8 @@ dependencies = [
     "pystray>=0.19",
     "Pillow>=6.0",
     "apscheduler>=3.6",
+    "fastapi>=0.68",
+    "uvicorn>=0.15",
 ]
 
 [project.scripts]
