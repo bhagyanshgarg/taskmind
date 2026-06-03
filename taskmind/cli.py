@@ -58,6 +58,23 @@ def yesterday():
 
 
 @main.command()
+@click.option("--date", "-d", "target_date", default=None, help="End date (YYYY-MM-DD)")
+def week(target_date):
+    """Show this week's aggregated recap."""
+    from taskmind.processing.recap import generate_weekly_recap
+    click.echo(generate_weekly_recap(target_date))
+
+
+@main.command()
+@click.option("--date", "-d", "target_date", default=None, help="Date (YYYY-MM-DD)")
+def recap(target_date):
+    """Show daily recap (same as 'today' with optional date)."""
+    if target_date is None:
+        target_date = date.today().isoformat()
+    click.echo(generate_recap(target_date))
+
+
+@main.command()
 @click.option("--date", "-d", "target_date", default=None, help="Date (YYYY-MM-DD)")
 @click.option("--export", "-e", "export_fmt", type=click.Choice(["csv", "json"]), help="Export format")
 def timesheet(target_date, export_fmt):

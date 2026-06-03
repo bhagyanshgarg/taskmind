@@ -79,6 +79,13 @@ def run_daemon():
     print("TaskMind daemon started (PID {})".format(os.getpid()))
 
     try:
+        from taskmind.utils.scheduler import start_scheduler, stop_scheduler
+        start_scheduler()
+        logger.info("Scheduler started (recap, reminders)")
+    except Exception as e:
+        logger.warning("Scheduler failed to start: %s", e)
+
+    try:
         while _running:
             try:
                 timestamp = datetime.now().isoformat()
@@ -110,6 +117,11 @@ def run_daemon():
 
             time.sleep(interval)
     finally:
+        try:
+            from taskmind.utils.scheduler import stop_scheduler
+            stop_scheduler()
+        except Exception:
+            pass
         _remove_pid()
         logger.info("TaskMind daemon stopped.")
         print("TaskMind daemon stopped.")
