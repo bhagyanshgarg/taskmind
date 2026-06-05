@@ -25,6 +25,7 @@ TaskMind fixes this by passively tracking your active windows, classifying them 
 | **Daily Recap** | End-of-day summary of what you accomplished |
 | **Full-Text Search** | Search across all captured activity |
 | **CSV/JSON Export** | Export timesheets for Jira, Clockify, Toggl |
+| **Audio Recording** | Record meetings — captures all participants (system audio) |
 | **System Tray** | Always-visible status icon |
 | **CLI** | `taskmind status`, `taskmind today`, `taskmind timesheet` |
 
@@ -83,14 +84,24 @@ taskmind stop            Stop the tracking daemon
 taskmind status          Show status and today's hours
 taskmind today           Show today's activity recap
 taskmind yesterday       Show yesterday's recap
+taskmind week            Show weekly aggregated recap
+taskmind recap -d DATE   Show recap for a specific date
 taskmind timesheet       Generate timesheet (--export csv|json)
 taskmind search          Full-text search across activities
+taskmind record          Start audio recording (system audio — all participants)
+taskmind stop-recording  Stop recording + auto-transcribe (works from any terminal)
+taskmind recordings      List past recordings with transcripts
+taskmind git-watch       Add repo to watch or scan for commits
+taskmind export          Export to csv/json/clockify/toggl/jira
 taskmind setup           Interactive project setup wizard
 taskmind add-project     Add a new project (guided)
 taskmind remove-project  Remove a project
 taskmind projects        List configured projects
+taskmind dashboard       Open web dashboard (localhost:7890)
+taskmind backup          Backup all data
+taskmind import-data     Restore from backup
 taskmind config          Open config in $EDITOR
-taskmind dashboard       Open web dashboard
+taskmind uninstall       Remove TaskMind (--purge to delete data)
 ```
 
 ## System Requirements
