@@ -55,9 +55,20 @@ def is_daemon_running():
         return False
 
 
+MEETING_KEYWORDS = ["Meet -", "Zoom Meeting", "Microsoft Teams", "meet.google.com", "Huddle"]
+_in_meeting = False
+
+
+def _is_meeting_window(title):
+    """Check if window title indicates an active meeting."""
+    if not title:
+        return False
+    return any(kw.lower() in title.lower() for kw in MEETING_KEYWORDS)
+
+
 def run_daemon():
     """Main daemon entry point."""
-    global _running
+    global _running, _in_meeting
 
     if is_daemon_running():
         print("TaskMind daemon is already running.")
@@ -93,6 +104,13 @@ def run_daemon():
 
                 if idle:
                     insert_activity(timestamp, "", "", "", "", interval, is_idle=True)
+                    # Stop recording if idle during meeting
+                    if _in_meeting:
+                        _in_meeting = False
+                        from taskmind.capture.audio_recorder import is_recording, stop_recording
+                        if is_recording():
+                            stop_recording()
+                            logger.info("Meeting ended (idle). Recording stopped.")
                 else:
                     window = get_active_window()
                     app = window["app_name"].lower()
@@ -112,8 +130,36 @@ def run_daemon():
                         interval,
                         is_idle=False,
                     )
+
+                    # Auto-record meetings (checks ALL open windows, not just focused)
+                    from taskmind.capture.audio_recorder import is_recording, start_recording, stop_recording
+                    from taskmind.capture.window_tracker import has_meeting_window
+                    meeting_active = has_meeting_window(MEETING_KEYWORDS)
+                    if meeting_active:
+                        if not _in_meeting:
+                            _in_meeting = True
+                            if not is_recording():
+                                filepath = start_recording()
+                                if filepath:
+                                    from taskmind.database import insert_recording
+                                    insert_recording(timestamp, filepath)
+                                    from taskmind.utils.notifications import notify
+                                    notify("🔴 Meeting Recording", "Auto-recording started")
+                                    logger.info("Meeting detected. Recording started: %s", filepath)
+                    else:
+                        if _in_meeting:
+                            _in_meeting = False
+                            if is_recording():
+                                result = stop_recording()
+                                if result:
+                                    from taskmind.database import update_recording
+                                    update_recording(result[0], timestamp, result[1], None, "done")
+                                    from taskmind.utils.notifications import notify
+                                    notify("⏹ Meeting Ended", "Recording stopped ({}s)".format(result[1]))
+                                    logger.info("Meeting ended. Recording stopped: %s", result[0])
             except Exception as e:
-                logger.error("Capture error: %s", e)
+                import traceback
+                logger.error("Capture error: %s\n%s", e, traceback.format_exc())
 
             time.sleep(interval)
     finally:

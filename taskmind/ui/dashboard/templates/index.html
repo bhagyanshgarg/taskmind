@@ -50,12 +50,21 @@ input, select { background: var(--bg); border: 1px solid var(--border); color: v
 <body>
 <nav>
   <div class="logo">🧠 Task<span>Mind</span></div>
-  <a href="#" data-page="home" class="active">Home</a>
+  <a href="#" data-page="home" class="active">Today</a>
+  <a href="#" data-page="weekly">Weekly</a>
+  <a href="#" data-page="monthly">Monthly</a>
   <a href="#" data-page="timesheet">Timesheet</a>
   <a href="#" data-page="search">Search</a>
+  <a href="#" data-page="recordings">Recordings</a>
   <a href="#" data-page="settings">Settings</a>
   <div class="status" id="nav-status">●</div>
+  <div id="rec-indicator" style="display:none;margin-left:12px;">
+    <span style="color:#ef4444;font-weight:bold;animation:blink 1s infinite">🔴 REC</span>
+    <button class="btn btn-danger btn-sm" onclick="stopRec()" style="margin-left:6px">Stop</button>
+  </div>
+  <button class="btn btn-sm" id="rec-start-btn" onclick="startRec()" style="margin-left:12px;background:#333;color:#fff">⏺ Record</button>
 </nav>
+<style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}</style>
 
 <div class="container">
 <!-- HOME -->
@@ -68,6 +77,46 @@ input, select { background: var(--bg); border: 1px solid var(--border); color: v
   <div class="card">
     <h2>Projects — Today</h2>
     <table><thead><tr><th>Project</th><th>Duration</th><th>%</th></tr></thead><tbody id="home-projects"></tbody></table>
+  </div>
+</div>
+
+<!-- WEEKLY -->
+<div class="page" id="page-weekly">
+  <div class="date-nav">
+    <button onclick="weekOffset++;loadWeekly()">← Prev Week</button>
+    <span id="weekly-range"></span>
+    <button onclick="if(weekOffset>0){weekOffset--;loadWeekly()}">Next Week →</button>
+  </div>
+  <div class="card">
+    <div class="stats" id="weekly-stats"></div>
+  </div>
+  <div class="card">
+    <h2>Projects This Week</h2>
+    <table><thead><tr><th>Project</th><th>Duration</th><th>%</th></tr></thead><tbody id="weekly-projects"></tbody></table>
+  </div>
+  <div class="card">
+    <h2>Daily Breakdown</h2>
+    <table><thead><tr><th>Day</th><th>Hours</th></tr></thead><tbody id="weekly-daily"></tbody></table>
+  </div>
+</div>
+
+<!-- MONTHLY -->
+<div class="page" id="page-monthly">
+  <div class="date-nav">
+    <button onclick="monthOffset++;loadMonthly()">← Prev Month</button>
+    <span id="monthly-range"></span>
+    <button onclick="if(monthOffset>0){monthOffset--;loadMonthly()}">Next Month →</button>
+  </div>
+  <div class="card">
+    <div class="stats" id="monthly-stats"></div>
+  </div>
+  <div class="card">
+    <h2>Projects This Month</h2>
+    <table><thead><tr><th>Project</th><th>Duration</th><th>%</th></tr></thead><tbody id="monthly-projects"></tbody></table>
+  </div>
+  <div class="card">
+    <h2>Daily Breakdown</h2>
+    <table><thead><tr><th>Day</th><th>Hours</th></tr></thead><tbody id="monthly-daily"></tbody></table>
   </div>
 </div>
 
@@ -99,6 +148,19 @@ input, select { background: var(--bg); border: 1px solid var(--border); color: v
   </div>
 </div>
 
+<!-- RECORDINGS -->
+<div class="page" id="page-recordings">
+  <div class="date-nav">
+    <button onclick="recDate=prevDay(recDate);loadRecordings()">← Prev</button>
+    <input type="date" id="rec-date" onchange="recDate=this.value;loadRecordings()">
+    <button onclick="recDate=nextDay(recDate);loadRecordings()">Next →</button>
+  </div>
+  <div class="card">
+    <h2>Recordings</h2>
+    <table><thead><tr><th>Date</th><th>Duration</th><th>Play</th><th>Status</th><th>Transcript</th></tr></thead><tbody id="rec-list"></tbody></table>
+  </div>
+</div>
+
 <!-- SETTINGS -->
 <div class="page" id="page-settings">
   <div class="card">
@@ -114,7 +176,7 @@ input, select { background: var(--bg); border: 1px solid var(--border); color: v
 </div>
 
 <script>
-const today = new Date().toISOString().split('T')[0];
+const today = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
 let currentDate = today;
 
 // Navigation
@@ -126,7 +188,10 @@ document.querySelectorAll('nav a').forEach(a => {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-' + a.dataset.page).classList.add('active');
     if (a.dataset.page === 'home') loadHome();
+    if (a.dataset.page === 'weekly') loadWeekly();
+    if (a.dataset.page === 'monthly') loadMonthly();
     if (a.dataset.page === 'timesheet') loadTimesheet();
+    if (a.dataset.page === 'recordings') loadRecordings();
     if (a.dataset.page === 'settings') loadSettings();
   };
 });
@@ -233,6 +298,101 @@ async function removeProject(index) {
   await fetch('/api/projects/remove', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({index})});
   loadSettings();
 }
+
+// WEEKLY
+let weekOffset = 0;
+async function loadWeekly() {
+  const data = await api('/api/weekly?offset=' + weekOffset);
+  const total = data.total_seconds || 0;
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+  const days = (data.daily || []).length || 1;
+  const avgH = Math.floor(total / days / 3600), avgM = Math.floor((total / days % 3600) / 60);
+
+  document.getElementById('weekly-range').textContent = data.start + ' to ' + data.end;
+  document.getElementById('weekly-stats').innerHTML = `
+    <div class="stat"><div class="value">${h}h ${m}m</div><div class="label">Total This Week</div></div>
+    <div class="stat"><div class="value">${avgH}h ${avgM}m</div><div class="label">Avg Per Day</div></div>
+    <div class="stat"><div class="value">${(data.projects||[]).length}</div><div class="label">Projects</div></div>
+  `;
+  document.getElementById('weekly-projects').innerHTML = (data.projects || []).map(p => {
+    const ph = Math.floor(p.total / 3600), pm = Math.floor((p.total % 3600) / 60);
+    const pct = total > 0 ? Math.round(p.total / total * 100) : 0;
+    return `<tr><td>${p.project_name || 'Unclassified'}</td><td>${ph}h ${pm}m</td><td>${pct}%</td></tr>`;
+  }).join('');
+  document.getElementById('weekly-daily').innerHTML = (data.daily || []).map(d => {
+    const dh = Math.floor(d.total / 3600), dm = Math.floor((d.total % 3600) / 60);
+    return `<tr><td>${d.day}</td><td>${dh}h ${dm}m</td></tr>`;
+  }).join('');
+}
+
+// MONTHLY
+let monthOffset = 0;
+async function loadMonthly() {
+  const data = await api('/api/monthly?offset=' + monthOffset);
+  const total = data.total_seconds || 0;
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+  const days = (data.daily || []).length || 1;
+  const avgH = Math.floor(total / days / 3600), avgM = Math.floor((total / days % 3600) / 60);
+
+  document.getElementById('monthly-range').textContent = data.start + ' to ' + data.end;
+  document.getElementById('monthly-stats').innerHTML = `
+    <div class="stat"><div class="value">${h}h ${m}m</div><div class="label">Total This Month</div></div>
+    <div class="stat"><div class="value">${avgH}h ${avgM}m</div><div class="label">Avg Per Day</div></div>
+    <div class="stat"><div class="value">${(data.projects||[]).length}</div><div class="label">Projects</div></div>
+  `;
+  document.getElementById('monthly-projects').innerHTML = (data.projects || []).map(p => {
+    const ph = Math.floor(p.total / 3600), pm = Math.floor((p.total % 3600) / 60);
+    const pct = total > 0 ? Math.round(p.total / total * 100) : 0;
+    return `<tr><td>${p.project_name || 'Unclassified'}</td><td>${ph}h ${pm}m</td><td>${pct}%</td></tr>`;
+  }).join('');
+  document.getElementById('monthly-daily').innerHTML = (data.daily || []).map(d => {
+    const dh = Math.floor(d.total / 3600), dm = Math.floor((d.total % 3600) / 60);
+    return `<tr><td>${d.day}</td><td>${dh}h ${dm}m</td></tr>`;
+  }).join('');
+}
+
+// RECORDINGS
+let recDate = today;
+function prevDay(d) { const dt = new Date(d); dt.setDate(dt.getDate()-1); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function nextDay(d) { const dt = new Date(d); dt.setDate(dt.getDate()+1); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+
+async function loadRecordings() {
+  document.getElementById('rec-date').value = recDate;
+  const data = await api('/api/recordings?date=' + recDate);
+  document.getElementById('rec-list').innerHTML = (data.recordings || []).map(r => {
+    const dur = r.duration_seconds || 0;
+    const mins = Math.floor(dur / 60), secs = dur % 60;
+    const status = r.status === 'done' ? '✅ Done' : r.status === 'recording' ? '🔴 Recording' : '❌ ' + r.status;
+    const transcript = r.transcript ? r.transcript.slice(0, 80) + '...' : '<span style="color:var(--muted)">No transcript</span>';
+    const filename = r.file_path ? r.file_path.split('/').pop() : '';
+    const player = filename && r.status === 'done' ? `<audio controls preload="none" style="height:28px;width:200px"><source src="/api/recordings/play/${filename}" type="audio/wav"></audio>` : '-';
+    return `<tr><td>${(r.started_at||'').slice(0,16)}</td><td>${mins}m ${secs}s</td><td>${player}</td><td>${status}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${transcript}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" style="color:var(--muted)">No recordings for this date</td></tr>';
+}
+
+// RECORDING UI
+async function checkRecStatus() {
+  const data = await api('/api/recording-status');
+  const ind = document.getElementById('rec-indicator');
+  const btn = document.getElementById('rec-start-btn');
+  if (data.recording) {
+    ind.style.display = 'inline';
+    btn.style.display = 'none';
+  } else {
+    ind.style.display = 'none';
+    btn.style.display = 'inline';
+  }
+}
+async function startRec() {
+  await fetch('/api/recording/start', {method:'POST'});
+  checkRecStatus();
+}
+async function stopRec() {
+  await fetch('/api/recording/stop', {method:'POST'});
+  checkRecStatus();
+}
+setInterval(checkRecStatus, 5000);
+checkRecStatus();
 
 // Init
 loadHome();

@@ -1,6 +1,6 @@
 [project]
 name = "taskmind"
-version = "1.0.1"
+version = "1.0.2"
 description = "Lightweight activity tracker and automatic timesheet generator for Linux"
 requires-python = ">=3.6"
 dependencies = [

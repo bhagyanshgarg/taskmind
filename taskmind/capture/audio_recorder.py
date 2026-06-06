@@ -35,24 +35,77 @@ def _get_monitor_source():
 
 
 def _get_record_cmd(filepath):
-    """Get recording command that captures system audio (all participants)."""
+    """Record mic + system audio. Works on minimal Linux (no ffmpeg, no GPU, 4-8GB RAM).
+    
+    Strategy:
+    1. Best: parecord from a combined source (mic + monitor via PulseAudio null sink)
+    2. Good: parecord from monitor (others) — your voice still goes through Meet
+    3. Fallback: parecord from mic only
+    """
     monitor = _get_monitor_source()
+    mic = _get_default_mic()
 
-    if monitor:
-        # Record from monitor source = captures everything you hear (all meeting participants)
-        if _cmd_exists("parecord"):
+    if _cmd_exists("parecord"):
+        if monitor and mic:
+            # Create a virtual combined sink that mixes mic + monitor
+            # This uses PulseAudio's module-null-sink + module-loopback (no ffmpeg needed)
+            _setup_combined_source(monitor, mic)
+            combined = "taskmind_combined.monitor"
+            # Check if combined source exists
+            result = subprocess.run(["pactl", "list", "short", "sources"],
+                                    capture_output=True, text=True, timeout=3)
+            if combined in result.stdout:
+                return ["parecord", "--file-format=wav", "-d", combined, filepath]
+            # Fallback to monitor only
             return ["parecord", "--file-format=wav", "-d", monitor, filepath]
-        elif _cmd_exists("pw-record"):
-            return ["pw-record", "--target", monitor, filepath]
-    else:
-        # Fallback: record mic only
-        if _cmd_exists("pw-record"):
-            return ["pw-record", "--target", "0", filepath]
-        elif _cmd_exists("parecord"):
+        elif monitor:
+            return ["parecord", "--file-format=wav", "-d", monitor, filepath]
+        else:
             return ["parecord", "--file-format=wav", filepath]
-        elif _cmd_exists("arecord"):
-            return ["arecord", "-f", "S16_LE", "-r", "16000", "-c", "1", filepath]
+    elif _cmd_exists("pw-record"):
+        if monitor:
+            return ["pw-record", "--target", monitor, filepath]
+        return ["pw-record", "--target", "0", filepath]
+    elif _cmd_exists("arecord"):
+        return ["arecord", "-f", "S16_LE", "-r", "16000", "-c", "1", filepath]
     return None
+
+
+def _get_default_mic():
+    """Get default microphone source."""
+    try:
+        result = subprocess.run(["pactl", "get-default-source"],
+                                capture_output=True, text=True, timeout=3)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return None
+
+
+def _setup_combined_source(monitor, mic):
+    """Create a PulseAudio null sink that combines mic + system audio. Lightweight, no ffmpeg."""
+    try:
+        # Check if already exists
+        result = subprocess.run(["pactl", "list", "short", "sinks"],
+                                capture_output=True, text=True, timeout=3)
+        if "taskmind_combined" in result.stdout:
+            return  # Already set up
+
+        # Create null sink
+        subprocess.run(["pactl", "load-module", "module-null-sink",
+                        "sink_name=taskmind_combined", "sink_properties=device.description=TaskMind_Recording"],
+                       capture_output=True, timeout=3)
+        # Loopback mic into it
+        subprocess.run(["pactl", "load-module", "module-loopback",
+                        "source=" + mic, "sink=taskmind_combined", "latency_msec=1"],
+                       capture_output=True, timeout=3)
+        # Loopback monitor into it
+        subprocess.run(["pactl", "load-module", "module-loopback",
+                        "source=" + monitor, "sink=taskmind_combined", "latency_msec=1"],
+                       capture_output=True, timeout=3)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
 
 
 def _cmd_exists(cmd):

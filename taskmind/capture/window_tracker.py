@@ -18,6 +18,61 @@ def _run(cmd):
         return ""
 
 
+def _get_all_windows_wayland():
+    """Get all open windows via Window Calls extension. Returns list of {title, wm_class}."""
+    try:
+        result = subprocess.run(
+            ["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+             "--object-path", "/org/gnome/Shell/Extensions/Windows",
+             "--method", "org.gnome.Shell.Extensions.Windows.List"],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode != 0 or "Error" in result.stdout:
+            return []
+
+        raw = result.stdout.strip()
+        start = raw.index("'") + 1
+        end = raw.rindex("'")
+        windows = json.loads(raw[start:end])
+
+        # Get titles for all windows
+        all_wins = []
+        for w in windows:
+            wid = w["id"]
+            title_result = subprocess.run(
+                ["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+                 "--object-path", "/org/gnome/Shell/Extensions/Windows",
+                 "--method", "org.gnome.Shell.Extensions.Windows.GetTitle",
+                 str(wid)],
+                capture_output=True, text=True, timeout=2,
+            )
+            title = ""
+            if title_result.returncode == 0:
+                t = title_result.stdout.strip()
+                if t.startswith("('") and t.endswith("',)"):
+                    title = t[2:-3]
+            all_wins.append({
+                "window_title": title,
+                "app_name": w.get("wm_class", ""),
+                "focused": w.get("focus", False),
+            })
+        return all_wins
+    except Exception:
+        return []
+
+
+def has_meeting_window(keywords):
+    """Check if ANY open window matches meeting keywords (not just focused)."""
+    session_type = os.environ.get("XDG_SESSION_TYPE", "")
+    if session_type == "wayland":
+        windows = _get_all_windows_wayland()
+        for w in windows:
+            title = (w.get("window_title") or "").lower()
+            if any(kw.lower() in title for kw in keywords):
+                return True
+    return False
+
+
 def _get_window_wayland():
     """Get focused window via Window Calls GNOME extension D-Bus API."""
     try:
