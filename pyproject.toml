@@ -16,6 +16,9 @@ dependencies = [
 [project.scripts]
 taskmind = "taskmind.cli:main"
 
+[tool.setuptools.package-data]
+taskmind = ["ui/dashboard/templates/*.html", "ui/dashboard/static/**/*"]
+
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
