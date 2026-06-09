@@ -108,8 +108,39 @@ def _setup_combined_source(monitor, mic):
         pass
 
 
+def _teardown_combined_source():
+    """Unload PulseAudio null sink + loopback modules to release mic."""
+    try:
+        result = subprocess.run(["pactl", "list", "short", "modules"],
+                                capture_output=True, text=True, timeout=3)
+        for line in reversed(result.stdout.strip().split("\n")):
+            if "taskmind_combined" in line or ("module-loopback" in line and "taskmind_combined" in line):
+                mod_id = line.split("\t")[0]
+                subprocess.run(["pactl", "unload-module", mod_id], capture_output=True, timeout=3)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+
 def _cmd_exists(cmd):
     return subprocess.run(["which", cmd], capture_output=True).returncode == 0
+
+
+def _compress_recording(wav_path):
+    """Convert WAV to OGG Opus (20x smaller). Deletes WAV on success."""
+    if not wav_path or not os.path.exists(wav_path):
+        return None
+    ogg_path = wav_path.rsplit(".", 1)[0] + ".ogg"
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", wav_path, "-c:a", "libopus", "-b:a", "32k", "-ac", "1", ogg_path],
+            capture_output=True, timeout=600
+        )
+        if result.returncode == 0 and os.path.exists(ogg_path) and os.path.getsize(ogg_path) > 0:
+            os.remove(wav_path)
+            return ogg_path
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return None
 
 
 def start_recording():
@@ -167,7 +198,10 @@ def stop_recording():
 
     duration = int((datetime.now() - started).total_seconds())
     _cleanup()
-    return (filepath, duration)
+    _teardown_combined_source()
+    # Compress WAV to OGG Opus (20x smaller, HTML5 playable)
+    compressed = _compress_recording(filepath)
+    return (compressed or filepath, duration)
 
 
 def is_recording():

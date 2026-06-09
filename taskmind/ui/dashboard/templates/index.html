@@ -365,7 +365,7 @@ async function loadRecordings() {
     const status = r.status === 'done' ? '✅ Done' : r.status === 'recording' ? '🔴 Recording' : '❌ ' + r.status;
     const transcript = r.transcript ? r.transcript.slice(0, 80) + '...' : '<span style="color:var(--muted)">No transcript</span>';
     const filename = r.file_path ? r.file_path.split('/').pop() : '';
-    const player = filename && r.status === 'done' ? `<audio controls preload="none" style="height:28px;width:200px"><source src="/api/recordings/play/${filename}" type="audio/wav"></audio>` : '-';
+    const player = filename && r.status === 'done' ? `<audio controls preload="none" style="height:28px;width:200px"><source src="/api/recordings/play/${filename}" type="audio/${filename.endsWith('.ogg')?'ogg':'wav'}"></audio>` : '-';
     return `<tr><td>${(r.started_at||'').slice(0,16)}</td><td>${mins}m ${secs}s</td><td>${player}</td><td>${status}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${transcript}</td></tr>`;
   }).join('') || '<tr><td colspan="5" style="color:var(--muted)">No recordings for this date</td></tr>';
 }

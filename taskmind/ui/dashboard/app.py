@@ -234,7 +234,8 @@ def api_play_recording(filename: str):
     from taskmind.config import DATA_DIR
     filepath = os.path.join(DATA_DIR, "recordings", filename)
     if os.path.exists(filepath):
-        return FileResponse(filepath, media_type="audio/wav")
+        media = "audio/ogg" if filename.endswith(".ogg") else "audio/wav"
+        return FileResponse(filepath, media_type=media)
     return JSONResponse({"error": "File not found"}, 404)
 
 

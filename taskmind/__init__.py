@@ -1,2 +1,2 @@
 """TaskMind - Lightweight activity tracker and timesheet generator."""
-__version__ = "1.0.2"
+__version__ = "1.0.3"
