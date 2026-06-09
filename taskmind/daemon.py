@@ -120,7 +120,7 @@ def run_daemon():
                         time.sleep(interval)
                         continue
 
-                    project = classify(window["window_title"], window["app_name"], window["window_class"])
+                    project = classify(window["window_title"], window["app_name"], window["window_class"], window.get("browser_url", ""))
                     insert_activity(
                         timestamp,
                         window["window_title"],

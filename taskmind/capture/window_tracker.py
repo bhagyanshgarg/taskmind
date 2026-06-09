@@ -156,10 +156,25 @@ def get_active_window():
     if session_type == "wayland":
         result = _get_window_wayland()
         if result:
+            result["browser_url"] = _extract_browser_url(result)
             return result
 
     result = _get_window_x11()
     if result:
+        result["browser_url"] = _extract_browser_url(result)
         return result
 
-    return {"window_title": "", "app_name": "", "window_class": ""}
+    return {"window_title": "", "app_name": "", "window_class": "", "browser_url": ""}
+
+
+def _extract_browser_url(window_info):
+    """Try to extract browser URL for the active window."""
+    try:
+        from taskmind.capture.browser_url import get_browser_url
+        return get_browser_url(
+            window_info.get("window_title", ""),
+            window_info.get("app_name", ""),
+            window_info.get("window_class", ""),
+        )
+    except Exception:
+        return ""

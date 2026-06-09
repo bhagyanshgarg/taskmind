@@ -2,27 +2,28 @@
 from taskmind.config import load_projects
 
 
-def classify(window_title, app_name, window_class=""):
+def classify(window_title, app_name, window_class="", browser_url=""):
     """Classify an activity into a project name based on rules. Returns project name or 'Unclassified'."""
     projects = load_projects()
     title_lower = (window_title or "").lower()
     app_lower = (app_name or "").lower()
     class_lower = (window_class or "").lower()
+    url_lower = (browser_url or "").lower()
 
     for project in projects:
         for matcher in project.get("matchers", []):
-            if _matches(matcher, title_lower, app_lower, class_lower):
+            if _matches(matcher, title_lower, app_lower, class_lower, url_lower):
                 return project["name"]
     return "Unclassified"
 
 
-def _matches(matcher, title_lower, app_lower, class_lower):
+def _matches(matcher, title_lower, app_lower, class_lower, url_lower):
     """Check if a single matcher rule matches the current window."""
     mtype = matcher.get("type", "")
 
     if mtype == "window_title":
         keywords = matcher.get("contains", [])
-        return any(k.lower() in title_lower for k in keywords)
+        return any(k.lower() in title_lower or k.lower() in url_lower for k in keywords)
 
     elif mtype == "app_name":
         apps = matcher.get("equals", [])
@@ -30,7 +31,7 @@ def _matches(matcher, title_lower, app_lower, class_lower):
         # If window_title_contains is also specified, both must match
         title_filter = matcher.get("window_title_contains", [])
         if title_filter:
-            return app_match and any(k.lower() in title_lower for k in title_filter)
+            return app_match and any(k.lower() in title_lower or k.lower() in url_lower for k in title_filter)
         return app_match
 
     elif mtype == "git_branch":
