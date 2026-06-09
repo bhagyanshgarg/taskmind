@@ -363,6 +363,15 @@ def add_project():
 
     name = click.prompt("Project name (e.g. 'Client Website', 'Meetings')")
 
+    # Check for duplicate names
+    if os.path.exists(PROJECTS_FILE):
+        with open(PROJECTS_FILE, "r") as f:
+            data = yaml.safe_load(f) or {}
+        existing = [p["name"].lower() for p in data.get("projects", [])]
+        if name.lower() in existing:
+            click.echo("❌ Project '{}' already exists. Use 'taskmind edit-project' to modify it.".format(name))
+            return
+
     click.echo("")
     click.echo("Now let's add rules to detect this project.")
     click.echo("TaskMind matches by window title and app name.")
@@ -457,6 +466,81 @@ def remove_project():
         yaml.dump({"projects": projs}, f, default_flow_style=False, sort_keys=False)
 
     click.echo("✅ Removed '{}'.".format(removed["name"]))
+
+
+@main.command(name="edit-project")
+def edit_project():
+    """Edit keywords for an existing project."""
+    import yaml
+    from taskmind.config import PROJECTS_FILE, load_projects
+
+    projs = load_projects()
+    if not projs:
+        click.echo("No projects configured.")
+        return
+
+    click.echo("Select project to edit:")
+    for i, p in enumerate(projs, 1):
+        keywords = []
+        for m in p.get("matchers", []):
+            keywords.extend(m.get("contains", []))
+            keywords.extend(m.get("equals", []))
+        click.echo("  {}. {} [{}]".format(i, p["name"], ", ".join(keywords)))
+
+    choice = click.prompt("Enter number", type=int)
+    if choice < 1 or choice > len(projs):
+        click.echo("Invalid choice.")
+        return
+
+    project = projs[choice - 1]
+    title_matcher = next((m for m in project.get("matchers", []) if m.get("type") == "window_title"), None)
+    keywords = list(title_matcher.get("contains", [])) if title_matcher else []
+
+    while True:
+        click.echo("")
+        click.echo("Project: {}".format(project["name"]))
+        click.echo("Keywords:")
+        if keywords:
+            for i, kw in enumerate(keywords, 1):
+                click.echo("  {}. {}".format(i, kw))
+        else:
+            click.echo("  (none)")
+        click.echo("")
+        click.echo("Actions: [a]dd, [r]emove, [d]one")
+        action = click.prompt("Choice", type=click.Choice(["a", "r", "d"]), show_choices=False)
+
+        if action == "a":
+            new_kw = click.prompt("  New keyword(s) (comma-separated)")
+            for k in new_kw.split(","):
+                k = k.strip()
+                if k and k not in keywords:
+                    keywords.append(k)
+        elif action == "r":
+            if not keywords:
+                click.echo("  No keywords to remove.")
+                continue
+            num = click.prompt("  Enter number to remove", type=int)
+            if 1 <= num <= len(keywords):
+                removed = keywords.pop(num - 1)
+                click.echo("  Removed '{}'".format(removed))
+            else:
+                click.echo("  Invalid number.")
+        elif action == "d":
+            break
+
+    # Save
+    if not keywords:
+        click.echo("No keywords set. Project unchanged.")
+        return
+
+    # Update only the window_title matcher, preserve other matchers
+    other_matchers = [m for m in project.get("matchers", []) if m.get("type") != "window_title"]
+    project["matchers"] = [{"type": "window_title", "contains": keywords}] + other_matchers
+
+    with open(PROJECTS_FILE, "w") as f:
+        yaml.dump({"projects": projs}, f, default_flow_style=False, sort_keys=False)
+
+    click.echo("✅ Updated '{}'.".format(project["name"]))
 
 
 @main.command(name="setup")
