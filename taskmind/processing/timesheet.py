@@ -19,7 +19,6 @@ def generate_timesheet(target_date=None):
 
     config = load_config()
     min_block = config["timesheet"]["minimum_block_minutes"]
-    round_to = config["timesheet"]["round_to_minutes"]
 
     # Group consecutive same-project activities into blocks
     blocks = []
@@ -56,6 +55,25 @@ def generate_timesheet(target_date=None):
     if current_block:
         blocks.append(current_block)
 
+    # Merge nearby blocks of the same project (absorb short interruptions)
+    merged = []
+    for block in blocks:
+        if merged and merged[-1]["project"] == block["project"]:
+            # Same project — merge if gap between them is short
+            gap = block["seconds"]  # the interrupting blocks were different projects
+            prev = merged[-1]
+            prev["end"] = block["end"]
+            prev["seconds"] += block["seconds"]
+            prev["titles"].extend(block["titles"])
+        elif merged and block["seconds"] < min_block * 60:
+            # Short block of a different project — absorb into previous block
+            merged[-1]["end"] = block["end"]
+            merged[-1]["seconds"] += block["seconds"]
+            merged[-1]["titles"].extend(block["titles"])
+        else:
+            merged.append(block)
+    blocks = merged
+
     # Filter out blocks shorter than minimum
     blocks = [b for b in blocks if b["seconds"] >= min_block * 60]
 
@@ -63,9 +81,6 @@ def generate_timesheet(target_date=None):
     entries = []
     for block in blocks:
         duration_min = block["seconds"] // 60
-        # Round up to nearest interval
-        if round_to > 0:
-            duration_min = ((duration_min + round_to - 1) // round_to) * round_to
 
         # Generate description from most common window titles
         desc = _top_titles(block["titles"], limit=3)
