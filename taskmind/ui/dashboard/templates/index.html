@@ -255,7 +255,7 @@ async function loadTimesheet() {
   let total = 0;
   document.getElementById('ts-body').innerHTML = tsEntries.map(e => {
     total += e.duration_minutes;
-    return `<tr><td>${e.start_time}</td><td>${e.end_time}</td><td>${e.project_name}</td><td>${e.duration_minutes}m</td><td>${(e.description||'').slice(0,40)}</td></tr>`;
+    return `<tr><td>${e.start_time}</td><td>${e.end_time}</td><td>${e.project_name}</td><td>${e.duration_minutes}m</td><td style="max-width:400px;word-wrap:break-word">${e.description||''}</td></tr>`;
   }).join('') + `<tr class="total-row"><td colspan="3">Total</td><td>${Math.floor(total/60)}h ${total%60}m</td><td></td></tr>`;
 }
 
@@ -278,16 +278,34 @@ async function doSearch() {
 // SETTINGS
 async function loadSettings() {
   const data = await api('/api/projects');
-  document.getElementById('settings-projects').innerHTML = (data.projects || []).map((p, i) =>
-    `<li><span><strong>${p.name}</strong> — ${(p.matchers||[]).map(m=>(m.contains||m.equals||[]).join(', ')).join('; ')}</span><button class="btn btn-danger btn-sm" onclick="removeProject(${i})">Remove</button></li>`
-  ).join('') || '<li style="color:var(--muted)">No projects configured</li>';
+  document.getElementById('settings-projects').innerHTML = (data.projects || []).map((p, i) => {
+    const keywords = (p.matchers||[]).map(m=>(m.contains||m.equals||[]).join(', ')).join('; ');
+    return `<li><span><strong>${p.name}</strong> — <span id="kw-display-${i}">${keywords}</span></span><span><button class="btn btn-sm" style="background:var(--border);color:var(--text);margin-right:6px" onclick="editProject(${i})">Edit</button><button class="btn btn-danger btn-sm" onclick="removeProject(${i})">Remove</button></span></li>`;
+  }).join('') || '<li style="color:var(--muted)">No projects configured</li>';
+}
+
+async function editProject(index) {
+  const data = await api('/api/projects');
+  const p = data.projects[index];
+  const titleMatcher = (p.matchers||[]).find(m => m.type === 'window_title');
+  const current = titleMatcher ? (titleMatcher.contains||[]).join(', ') : '';
+  const newKw = prompt('Edit keywords for "' + p.name + '" (comma-separated):', current);
+  if (newKw === null) return;
+  const keywords = newKw.split(',').map(s => s.trim()).filter(Boolean);
+  if (!keywords.length) return alert('Keywords cannot be empty');
+  const res = await fetch('/api/projects/edit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({index, keywords})});
+  const result = await res.json();
+  if (result.error) alert(result.error);
+  else loadSettings();
 }
 
 async function addProject() {
   const name = document.getElementById('new-project-name').value.trim();
   const kw = document.getElementById('new-project-keywords').value.trim();
   if (!name || !kw) return alert('Enter project name and keywords');
-  await fetch('/api/projects/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, keywords: kw.split(',').map(s=>s.trim())})});
+  const res = await fetch('/api/projects/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, keywords: kw.split(',').map(s=>s.trim())})});
+  const result = await res.json();
+  if (result.error) { alert(result.error); return; }
   document.getElementById('new-project-name').value = '';
   document.getElementById('new-project-keywords').value = '';
   loadSettings();

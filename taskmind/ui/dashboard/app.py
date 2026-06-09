@@ -123,7 +123,32 @@ async def api_add_project(request: Request):
         return JSONResponse({"error": "Name and keywords required"}, 400)
 
     projects = load_projects()
+    if any(p["name"].lower() == name.lower() for p in projects):
+        return JSONResponse({"error": "Project '{}' already exists".format(name)}, 400)
+
     projects.append({"name": name, "matchers": [{"type": "window_title", "contains": keywords}]})
+    with open(PROJECTS_FILE, "w") as f:
+        yaml.dump({"projects": projects}, f, default_flow_style=False, sort_keys=False)
+    return {"ok": True}
+
+
+@app.post("/api/projects/edit")
+async def api_edit_project(request: Request):
+    import yaml
+    data = await request.json()
+    index = data.get("index", -1)
+    keywords = data.get("keywords", [])
+    projects = load_projects()
+    if not (0 <= index < len(projects)):
+        return JSONResponse({"error": "Invalid index"}, 400)
+    if not keywords:
+        return JSONResponse({"error": "Keywords required"}, 400)
+
+    # Rebuild matchers keeping only window_title type with new keywords
+    project = projects[index]
+    non_title_matchers = [m for m in project.get("matchers", []) if m.get("type") != "window_title"]
+    project["matchers"] = [{"type": "window_title", "contains": keywords}] + non_title_matchers
+
     with open(PROJECTS_FILE, "w") as f:
         yaml.dump({"projects": projects}, f, default_flow_style=False, sort_keys=False)
     return {"ok": True}
